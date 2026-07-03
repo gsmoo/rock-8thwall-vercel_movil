@@ -24,7 +24,7 @@ function getClipDuration(clip) {
 }
 
 function selectModelAnimation(clips) {
-  const preferredName = 'ArmatureAction';
+  const preferredName = 'Take 001';
   const preferredClips = clips.filter((clip) => clip.name === preferredName);
   const candidates = preferredClips.length ? preferredClips : clips;
 
@@ -79,9 +79,10 @@ const modelSpawnComponent = {
           const action = this.animationMixer.clipAction(selectedClip);
           action.reset();
           action.setLoop(THREE.LoopRepeat, Infinity);
+          action.setEffectiveTimeScale(0.75);
           action.enabled = true;
           action.play();
-          console.log(`▶️ Playing animation "${selectedClip.name}" with ${selectedClip.tracks?.length || 0} tracks`);
+          console.log(`▶️ Playing animation "${selectedClip.name}" with ${selectedClip.tracks?.length || 0} tracks at 75% speed`);
         } else {
           console.warn('⚠️ No animation clips found in model.');
         }
