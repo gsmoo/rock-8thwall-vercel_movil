@@ -403,6 +403,8 @@ const modelSpawnComponent = {
       found = true;
     };
 
+    this.el.addEventListener('xrextrasfound', showObject);
+    this.el.addEventListener('xrimagefound', showObject);
     scene.addEventListener('xrimagefound', showObject);
   },
 };
