@@ -22,20 +22,27 @@ const modelSpawnComponent = {
   init() {
     const scene = this.el.sceneEl;
     const component = this;
+    const targetEntity = this.el;
     this.animationMixers = [];
     let found = false;
 
     const showObject = () => {
       if (found) return;
 
-      console.log('➡ Image Target detected → Spawning anchored group');
+      console.log('➡ Image Target detected → Spawning persistent group');
 
       const groupRoot = document.createElement('a-entity');
       groupRoot.setAttribute('id', 'group-root');
       groupRoot.setAttribute('position', '0 0 0');
-      groupRoot.setAttribute('xrextras-attach', 'target: image-target; offset: 0 0 0');
       scene.appendChild(groupRoot);
       groupRoot.flushToDOM();
+      targetEntity.object3D.updateMatrixWorld(true);
+      const targetPosition = new THREE.Vector3();
+      const targetQuaternion = new THREE.Quaternion();
+      const targetScale = new THREE.Vector3();
+      targetEntity.object3D.matrixWorld.decompose(targetPosition, targetQuaternion, targetScale);
+      groupRoot.object3D.position.copy(targetPosition);
+      groupRoot.object3D.quaternion.copy(targetQuaternion);
 
       // ✅ Crear el modelo dinámicamente
       const model = document.createElement('a-entity');
@@ -54,7 +61,7 @@ const modelSpawnComponent = {
       groupRoot.appendChild(model);
       model.flushToDOM();
 
-      console.log('✅ Modelo creado dentro de group-root anclado al image target');
+      console.log('✅ Modelo creado en group-root persistente con pose inicial del image target');
 
       model.addEventListener('model-loaded', (event) => {
         console.log('✅ Model loaded');
