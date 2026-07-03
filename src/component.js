@@ -36,7 +36,7 @@ const modelSpawnComponent = {
       model.setAttribute('scale', '9 9 9');
       model.setAttribute('xrextras-pinch-scale', '');
       model.setAttribute('xrextras-hold-drag', 'riseHeight: 0.25');
-      model.setAttribute('animation-mixer', 'clip: Take 001; loop: repeat; timeScale: 0.75');
+      model.setAttribute('animation-mixer', 'clip: ArmatureAction; loop: repeat; timeScale: 1');
       model.setAttribute('position', '0 0 0');
       model.classList.add('cantap');
       model.setAttribute('visible', 'true');
@@ -53,7 +53,7 @@ const modelSpawnComponent = {
 
         const clips = event.detail?.model?.animations || model.getObject3D('mesh')?.animations || [];
         console.log('🎞 Animation clips detected:', clips.map((clip) => clip.name).join(', ') || 'none');
-        model.setAttribute('animation-mixer', 'clip: Take 001; loop: repeat; timeScale: 0.75');
+        model.setAttribute('animation-mixer', 'clip: ArmatureAction; loop: repeat; timeScale: 1');
 
         model.setAttribute('visible', 'true');
         model.object3D.position.set(0, 0, 0);
