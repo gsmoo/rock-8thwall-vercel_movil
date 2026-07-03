@@ -23,10 +23,10 @@ const modelSpawnComponent = {
     const scene = this.el.sceneEl;
     let found = false;
 
-    const showObject = ({ detail }) => {
+    const showObject = () => {
       if (found) return;
 
-      console.log('➡ Image Target detected → Spawning model directly');
+      console.log('➡ Image Target detected → Spawning model on target');
 
       // ✅ Crear el modelo dinámicamente
       const model = document.createElement('a-entity');
@@ -36,24 +36,24 @@ const modelSpawnComponent = {
       model.setAttribute('scale', '9 9 9');
       model.setAttribute('xrextras-pinch-scale', '');
       model.setAttribute('xrextras-hold-drag', 'riseHeight: 0.25');
-      model.setAttribute('animation-mixer', 'clip: ArmatureAction; loop: repeat; timeScale: 1');
+      model.setAttribute('animation-mixer', 'clip: Take 001; loop: repeat; timeScale: 0.75');
       model.setAttribute('position', '0 0 0');
       model.classList.add('cantap');
       model.setAttribute('visible', 'true');
 
       
 
-      scene.appendChild(model);
+      this.el.appendChild(model);
       model.flushToDOM();
 
-      console.log('✅ Modelo creado como entidad raíz');
+      console.log('✅ Modelo creado dentro del image target');
 
       model.addEventListener('model-loaded', (event) => {
         console.log('✅ Model loaded');
 
         const clips = event.detail?.model?.animations || model.getObject3D('mesh')?.animations || [];
         console.log('🎞 Animation clips detected:', clips.map((clip) => clip.name).join(', ') || 'none');
-        model.setAttribute('animation-mixer', 'clip: ArmatureAction; loop: repeat; timeScale: 1');
+        model.setAttribute('animation-mixer', 'clip: Take 001; loop: repeat; timeScale: 0.75');
 
         model.setAttribute('visible', 'true');
         model.object3D.position.set(0, 0, 0);
@@ -120,7 +120,7 @@ const modelSpawnComponent = {
         ground.setAttribute('position', '0 0 0');
         ground.setAttribute('xrextras-attach', 'target: model; offset: 0 0 0');
 
-        scene.appendChild(ground);
+        this.el.appendChild(ground);
         ground.flushToDOM();
 
         console.log('✅ Ground creado');
@@ -206,15 +206,14 @@ const modelSpawnComponent = {
           shadowBias: -0.0001;
         `);
         directional.setAttribute('position', '15 25 10');
-        directional.setAttribute('xrextras-attach', 'target: model; offset: 15 25 10');
-        scene.appendChild(directional);
+        directional.setAttribute('position', '15 25 10');
+        this.el.appendChild(directional);
         directional.flushToDOM();
 
         const ambient = document.createElement('a-light');
         ambient.setAttribute('type', 'ambient');
         ambient.setAttribute('intensity', '0.4');
-        ambient.setAttribute('xrextras-attach', 'target: model; offset: 0 0 0');
-        scene.appendChild(ambient);
+        this.el.appendChild(ambient);
         ambient.flushToDOM();
 
         console.log('✅ Luces creadas');
@@ -223,7 +222,7 @@ const modelSpawnComponent = {
       found = true;
     };
 
-    scene.addEventListener('xrimagefound', showObject);
+    this.el.addEventListener('xrextrasfound', showObject);
   },
 };
 
