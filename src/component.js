@@ -18,21 +18,69 @@ function safeActivateComponent(entity, componentName) {
   }, 50);
 }
 
-function selectModelAnimations(clips) {
-  const preferredName = 'Take 001';
-  const preferredClips = clips.filter((clip) => clip.name === preferredName);
+AFRAME.registerComponent('play-model-animation', {
+  schema: {
+    clip: {default: 'Take 001'},
+    timeScale: {default: 0.75},
+  },
 
-  if (preferredClips.length) return preferredClips;
+  init() {
+    this.mixer = null;
+    this.actions = [];
+    this.onModelLoaded = this.onModelLoaded.bind(this);
+    this.el.addEventListener('model-loaded', this.onModelLoaded);
+  },
 
-  console.warn(`⚠️ Animation "${preferredName}" not found. Falling back to all available clips.`);
-  return clips;
-}
+  onModelLoaded(event) {
+    const root = event.detail?.model || this.el.getObject3D('mesh');
+    const clips = root?.animations || [];
+    const selectedClips = clips.filter((clip) => clip.name === this.data.clip);
+
+    console.log('🎞 Animation clips detected:', clips.map((clip) => `${clip.name} (${clip.tracks?.length || 0} tracks)`).join(', ') || 'none');
+
+    if (!root) {
+      console.warn('⚠️ Model root not found for animation.');
+      return;
+    }
+
+    if (!selectedClips.length) {
+      console.warn(`⚠️ Animation "${this.data.clip}" not found. No model animation started.`);
+      return;
+    }
+
+    this.mixer = new THREE.AnimationMixer(root);
+    this.actions = selectedClips.map((clip) => {
+      const action = this.mixer.clipAction(clip);
+      action.reset();
+      action.setLoop(THREE.LoopRepeat, Infinity);
+      action.setEffectiveTimeScale(this.data.timeScale);
+      action.enabled = true;
+      action.play();
+      console.log(`▶️ Playing animation "${clip.name}" with ${clip.tracks?.length || 0} tracks at ${Math.round(this.data.timeScale * 100)}% speed`);
+      return action;
+    });
+  },
+
+  tick(time, deltaTime) {
+    if (!this.mixer || !deltaTime) return;
+    this.mixer.update(deltaTime / 1000);
+  },
+
+  remove() {
+    this.el.removeEventListener('model-loaded', this.onModelLoaded);
+    if (this.mixer) {
+      this.actions.forEach((action) => action.stop());
+      this.mixer.stopAllAction();
+    }
+    this.mixer = null;
+    this.actions = [];
+  },
+});
 
 const modelSpawnComponent = {
   init() {
     const scene = this.el.sceneEl;
     let found = false;
-    this.animationMixer = null;
 
     const showObject = ({ detail }) => {
       if (found) return;
@@ -47,6 +95,7 @@ const modelSpawnComponent = {
       model.setAttribute('scale', '9 9 9');
       model.setAttribute('xrextras-pinch-scale', '');
       model.setAttribute('xrextras-hold-drag', 'riseHeight: 0.25');
+      model.setAttribute('play-model-animation', 'clip: Take 001; timeScale: 0.75');
       model.setAttribute('position', '0 0 0');
       model.classList.add('cantap');
       model.setAttribute('visible', 'true');
@@ -63,22 +112,6 @@ const modelSpawnComponent = {
 
         const clips = event.detail?.model?.animations || model.getObject3D('mesh')?.animations || [];
         console.log('🎞 Animation clips detected:', clips.map((clip) => `${clip.name} (${clip.tracks?.length || 0} tracks)`).join(', ') || 'none');
-
-        const selectedClips = selectModelAnimations(clips);
-        if (selectedClips.length) {
-          this.animationMixer = new THREE.AnimationMixer(event.detail.model);
-          selectedClips.forEach((clip) => {
-            const action = this.animationMixer.clipAction(clip);
-            action.reset();
-            action.setLoop(THREE.LoopRepeat, Infinity);
-            action.setEffectiveTimeScale(0.75);
-            action.enabled = true;
-            action.play();
-            console.log(`▶️ Playing animation "${clip.name}" with ${clip.tracks?.length || 0} tracks at 75% speed`);
-          });
-        } else {
-          console.warn('⚠️ No animation clips found in model.');
-        }
 
         model.setAttribute('visible', 'true');
         model.object3D.position.set(0, 0, 0);
@@ -249,11 +282,6 @@ const modelSpawnComponent = {
     };
 
     scene.addEventListener('xrimagefound', showObject);
-  },
-
-  tick(time, deltaTime) {
-    if (!this.animationMixer || !deltaTime) return;
-    this.animationMixer.update(deltaTime / 1000);
   },
 };
 
