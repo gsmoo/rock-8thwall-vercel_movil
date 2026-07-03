@@ -18,10 +18,30 @@ function safeActivateComponent(entity, componentName) {
   }, 50);
 }
 
+function getClipDuration(clip) {
+  if (typeof clip.duration === 'number') return clip.duration;
+  return 0;
+}
+
+function selectModelAnimation(clips) {
+  const preferredName = 'ArmatureAction';
+  const preferredClips = clips.filter((clip) => clip.name === preferredName);
+  const candidates = preferredClips.length ? preferredClips : clips;
+
+  return candidates
+    .slice()
+    .sort((a, b) => {
+      const trackDiff = (b.tracks?.length || 0) - (a.tracks?.length || 0);
+      if (trackDiff) return trackDiff;
+      return getClipDuration(b) - getClipDuration(a);
+    })[0];
+}
+
 const modelSpawnComponent = {
   init() {
     const scene = this.el.sceneEl;
     let found = false;
+    this.animationMixer = null;
 
     const showObject = ({ detail }) => {
       if (found) return;
@@ -36,7 +56,6 @@ const modelSpawnComponent = {
       model.setAttribute('scale', '9 9 9');
       model.setAttribute('xrextras-pinch-scale', '');
       model.setAttribute('xrextras-hold-drag', 'riseHeight: 0.25');
-      model.setAttribute('animation-mixer', 'clip: ArmatureAction; loop: repeat; timeScale: 1');
       model.setAttribute('position', '0 0 0');
       model.classList.add('cantap');
       model.setAttribute('visible', 'true');
@@ -52,8 +71,20 @@ const modelSpawnComponent = {
         console.log('✅ Model loaded');
 
         const clips = event.detail?.model?.animations || model.getObject3D('mesh')?.animations || [];
-        console.log('🎞 Animation clips detected:', clips.map((clip) => clip.name).join(', ') || 'none');
-        model.setAttribute('animation-mixer', 'clip: ArmatureAction; loop: repeat; timeScale: 1');
+        console.log('🎞 Animation clips detected:', clips.map((clip) => `${clip.name} (${clip.tracks?.length || 0} tracks)`).join(', ') || 'none');
+
+        const selectedClip = selectModelAnimation(clips);
+        if (selectedClip) {
+          this.animationMixer = new THREE.AnimationMixer(event.detail.model);
+          const action = this.animationMixer.clipAction(selectedClip);
+          action.reset();
+          action.setLoop(THREE.LoopRepeat, Infinity);
+          action.enabled = true;
+          action.play();
+          console.log(`▶️ Playing animation "${selectedClip.name}" with ${selectedClip.tracks?.length || 0} tracks`);
+        } else {
+          console.warn('⚠️ No animation clips found in model.');
+        }
 
         model.setAttribute('visible', 'true');
         model.object3D.position.set(0, 0, 0);
@@ -224,6 +255,11 @@ const modelSpawnComponent = {
     };
 
     scene.addEventListener('xrimagefound', showObject);
+  },
+
+  tick(time, deltaTime) {
+    if (!this.animationMixer || !deltaTime) return;
+    this.animationMixer.update(deltaTime / 1000);
   },
 };
 
