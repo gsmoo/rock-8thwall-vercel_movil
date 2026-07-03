@@ -71,10 +71,11 @@ const modelSpawnComponent = {
           const mixer = new THREE.AnimationMixer(animatedRoot);
           const action = mixer.clipAction(take001Clip);
           action.reset();
-          action.setLoop(THREE.LoopRepeat);
+          action.setLoop(THREE.LoopOnce, 1);
+          action.clampWhenFinished = true;
           action.timeScale = 0.75;
           action.play();
-          console.log(`✅ Animación lanzada: "${take001Clip.name}" a 75% (${take001Clip.tracks.length} tracks)`);
+          console.log(`✅ Animación lanzada una vez: "${take001Clip.name}" a 75% (${take001Clip.tracks.length} tracks)`);
           component.animationMixers.push(mixer);
         } else {
           console.warn('⚠️ No se encontró la animación exacta "Take 001"');
