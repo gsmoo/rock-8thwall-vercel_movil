@@ -33,7 +33,7 @@ const modelSpawnComponent = {
       const groupRoot = document.createElement('a-entity');
       groupRoot.setAttribute('id', 'group-root');
       groupRoot.setAttribute('position', '0 0 0');
-      groupRoot.setAttribute('xrextras-attach', 'target: qr-code; offset: 0 0 0');
+      groupRoot.setAttribute('xrextras-attach', 'target: image-target; offset: 0 0 0');
       scene.appendChild(groupRoot);
       groupRoot.flushToDOM();
 

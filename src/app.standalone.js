@@ -1,6 +1,6 @@
 import {splashImageComponent} from './splash-image.js'
 import {backButtonComponent, nextButtonComponent} from './button.js'
-import {modelSpawnComponent} from './component.js?v=nearclip-20260703a'
+import {modelSpawnComponent} from './component.js?v=image-target-20260703a'
 import './confetti.js'
 import './texture-pulse.js'
 
@@ -8,17 +8,17 @@ const configureImageTargets = () => {
   XR8.XrController.configure({
     imageTargetData: [
       {
-        imagePath: './image-targets/qr-code.png',
+        imagePath: './image-targets/image-target.png',
         metadata: {},
-        name: 'qr-code',
+        name: 'image-target',
         type: 'PLANAR',
         properties: {
           left: 0,
           top: 0,
-          width: 1254,
-          height: 1254,
-          originalWidth: 1254,
-          originalHeight: 1254,
+          width: 1024,
+          height: 1024,
+          originalWidth: 1024,
+          originalHeight: 1024,
           isRotated: false,
         },
       },
