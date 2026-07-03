@@ -64,16 +64,17 @@ const modelSpawnComponent = {
 
         const animatedRoot = event.detail?.model || model.getObject3D('mesh');
         const take001Clips = clips.filter((clip) => clip.name === 'Take 001');
-        if (animatedRoot && take001Clips.length) {
+        const take001Clip = take001Clips
+          .slice()
+          .sort((a, b) => b.tracks.length - a.tracks.length)[0];
+        if (animatedRoot && take001Clip) {
           const mixer = new THREE.AnimationMixer(animatedRoot);
-          take001Clips.forEach((clip) => {
-            const action = mixer.clipAction(clip);
-            action.reset();
-            action.setLoop(THREE.LoopRepeat);
-            action.timeScale = 0.75;
-            action.play();
-            console.log(`✅ Animación lanzada: "${clip.name}" a 75%`);
-          });
+          const action = mixer.clipAction(take001Clip);
+          action.reset();
+          action.setLoop(THREE.LoopRepeat);
+          action.timeScale = 0.75;
+          action.play();
+          console.log(`✅ Animación lanzada: "${take001Clip.name}" a 75% (${take001Clip.tracks.length} tracks)`);
           component.animationMixers.push(mixer);
         } else {
           console.warn('⚠️ No se encontró la animación exacta "Take 001"');
