@@ -21,12 +21,21 @@ function safeActivateComponent(entity, componentName) {
 const modelSpawnComponent = {
   init() {
     const scene = this.el.sceneEl;
+    const component = this;
+    this.animationMixers = [];
     let found = false;
 
     const showObject = () => {
       if (found) return;
 
-      console.log('➡ Image Target detected → Spawning model on target');
+      console.log('➡ Image Target detected → Spawning anchored group');
+
+      const groupRoot = document.createElement('a-entity');
+      groupRoot.setAttribute('id', 'group-root');
+      groupRoot.setAttribute('position', '0 0 0');
+      groupRoot.setAttribute('xrextras-attach', 'target: qr-code; offset: 0 0 0');
+      scene.appendChild(groupRoot);
+      groupRoot.flushToDOM();
 
       // ✅ Crear el modelo dinámicamente
       const model = document.createElement('a-entity');
@@ -36,24 +45,39 @@ const modelSpawnComponent = {
       model.setAttribute('scale', '9 9 9');
       model.setAttribute('xrextras-pinch-scale', '');
       model.setAttribute('xrextras-hold-drag', 'riseHeight: 0.25');
-      model.setAttribute('animation-mixer', 'clip: Take 001; loop: repeat; timeScale: 0.75');
       model.setAttribute('position', '0 0 0');
       model.classList.add('cantap');
       model.setAttribute('visible', 'true');
 
       
 
-      this.el.appendChild(model);
+      groupRoot.appendChild(model);
       model.flushToDOM();
 
-      console.log('✅ Modelo creado dentro del image target');
+      console.log('✅ Modelo creado dentro de group-root anclado al image target');
 
       model.addEventListener('model-loaded', (event) => {
         console.log('✅ Model loaded');
 
         const clips = event.detail?.model?.animations || model.getObject3D('mesh')?.animations || [];
         console.log('🎞 Animation clips detected:', clips.map((clip) => clip.name).join(', ') || 'none');
-        model.setAttribute('animation-mixer', 'clip: Take 001; loop: repeat; timeScale: 0.75');
+
+        const animatedRoot = event.detail?.model || model.getObject3D('mesh');
+        const take001Clips = clips.filter((clip) => clip.name === 'Take 001');
+        if (animatedRoot && take001Clips.length) {
+          const mixer = new THREE.AnimationMixer(animatedRoot);
+          take001Clips.forEach((clip) => {
+            const action = mixer.clipAction(clip);
+            action.reset();
+            action.setLoop(THREE.LoopRepeat);
+            action.timeScale = 0.75;
+            action.play();
+            console.log(`✅ Animación lanzada: "${clip.name}" a 75%`);
+          });
+          component.animationMixers.push(mixer);
+        } else {
+          console.warn('⚠️ No se encontró la animación exacta "Take 001"');
+        }
 
         model.setAttribute('visible', 'true');
         model.object3D.position.set(0, 0, 0);
@@ -80,9 +104,7 @@ const modelSpawnComponent = {
           return;
         }
 
-        video.addEventListener('canplay', () => {
-          console.log('🎬 Video canplay');
-
+        const applyVideoToScreens = () => {
           const videoTexture = new THREE.VideoTexture(video);
           videoTexture.encoding = THREE.sRGBEncoding;
           videoTexture.flipY = false;
@@ -93,17 +115,35 @@ const modelSpawnComponent = {
             return;
           }
 
+          let applied = 0;
           mesh.traverse((node) => {
-            if (node.isMesh && node.material?.name === 'screen') {
-              node.material.map = videoTexture;
-              node.material.emissiveMap = videoTexture;
-              node.material.roughness = 0.1;
-              node.material.emissive = new THREE.Color(0xffffff);
-              node.material.needsUpdate = true;
-              console.log(`✅ Video aplicado al material "${node.material.name}"`);
-            }
+            if (!node.isMesh || !node.material) return;
+
+            const materials = Array.isArray(node.material) ? node.material : [node.material];
+            materials.forEach((material) => {
+              const materialName = material?.name || '';
+              const normalizedName = materialName.toLowerCase();
+              if (normalizedName === 'screen' || normalizedName.endsWith(':screen')) {
+                material.map = videoTexture;
+                material.emissiveMap = videoTexture;
+                material.roughness = 0.1;
+                material.emissive = new THREE.Color(0xffffff);
+                material.needsUpdate = true;
+                applied++;
+                console.log(`✅ Video aplicado al material "${materialName}"`);
+              }
+            });
           });
-        });
+          if (!applied) {
+            console.warn('⚠️ No se encontró ningún material de pantalla para aplicar el video');
+          }
+        };
+
+        if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          applyVideoToScreens();
+        } else {
+          video.addEventListener('canplay', applyVideoToScreens, { once: true });
+        }
 
         video.play().catch((error) => {
           console.warn('⚠️ Autoplay bloqueado hasta interacción:', error);
@@ -118,9 +158,8 @@ const modelSpawnComponent = {
         ground.setAttribute('material', 'shader: shadow');
         ground.setAttribute('shadow', 'receive: true');
         ground.setAttribute('position', '0 0 0');
-        ground.setAttribute('xrextras-attach', 'target: model; offset: 0 0 0');
 
-        this.el.appendChild(ground);
+        groupRoot.appendChild(ground);
         ground.flushToDOM();
 
         console.log('✅ Ground creado');
@@ -134,7 +173,7 @@ const modelSpawnComponent = {
           confetti1.setAttribute('id', 'confetti-emitter-1');
           confetti1.setAttribute('rotation', '0 90 0');
           confetti1.setAttribute('scale', '8 8 8');
-          confetti1.setAttribute('xrextras-attach', 'target: model; offset: 15.5 3.8 5');
+          confetti1.setAttribute('position', '15.5 3.8 5');
 
           if (AFRAME.components['confetti-loop']) {
             confetti1.setAttribute('confetti-loop', '');
@@ -142,7 +181,7 @@ const modelSpawnComponent = {
             console.warn('⚠️ Componente confetti-loop no está registrado.');
           }
 
-          scene.appendChild(confetti1);
+          groupRoot.appendChild(confetti1);
           confetti1.flushToDOM();
           safeActivateComponent(confetti1, 'confetti-loop');
 
@@ -151,7 +190,7 @@ const modelSpawnComponent = {
           confetti2.setAttribute('id', 'confetti-emitter-2');
           confetti2.setAttribute('rotation', '0 270 0');
           confetti2.setAttribute('scale', '8 8 8');
-          confetti2.setAttribute('xrextras-attach', 'target: model; offset: -16.3 3.8 4.6');
+          confetti2.setAttribute('position', '-16.3 3.8 4.6');
 
           if (AFRAME.components['confetti-loop']) {
             confetti2.setAttribute('confetti-loop', '');
@@ -159,7 +198,7 @@ const modelSpawnComponent = {
             console.warn('⚠️ Componente confetti-loop no está registrado.');
           }
 
-          scene.appendChild(confetti2);
+          groupRoot.appendChild(confetti2);
           confetti2.flushToDOM();
           safeActivateComponent(confetti2, 'confetti-loop');
 
@@ -175,7 +214,7 @@ const modelSpawnComponent = {
             } else {
               offset = `19 ${i === 3 ? 18 : 24} 5`;
             }
-            emitter.setAttribute('xrextras-attach', `target: model; offset: ${offset}`);
+            emitter.setAttribute('position', offset);
 
             if (AFRAME.components['texture-pulse']) {
               emitter.setAttribute('texture-pulse', '');
@@ -183,7 +222,7 @@ const modelSpawnComponent = {
               console.warn(`⚠️ Componente texture-pulse no está registrado.`);
             }
 
-            scene.appendChild(emitter);
+            groupRoot.appendChild(emitter);
             emitter.flushToDOM();
             safeActivateComponent(emitter, 'texture-pulse');
           }
@@ -206,14 +245,13 @@ const modelSpawnComponent = {
           shadowBias: -0.0001;
         `);
         directional.setAttribute('position', '15 25 10');
-        directional.setAttribute('position', '15 25 10');
-        this.el.appendChild(directional);
+        groupRoot.appendChild(directional);
         directional.flushToDOM();
 
         const ambient = document.createElement('a-light');
         ambient.setAttribute('type', 'ambient');
         ambient.setAttribute('intensity', '0.4');
-        this.el.appendChild(ambient);
+        groupRoot.appendChild(ambient);
         ambient.flushToDOM();
 
         console.log('✅ Luces creadas');
@@ -222,7 +260,13 @@ const modelSpawnComponent = {
       found = true;
     };
 
-    this.el.addEventListener('xrextrasfound', showObject);
+    scene.addEventListener('xrimagefound', showObject);
+  },
+
+  tick(time, timeDelta) {
+    if (!this.animationMixers?.length || !timeDelta) return;
+    const deltaSeconds = timeDelta / 1000;
+    this.animationMixers.forEach((mixer) => mixer.update(deltaSeconds));
   },
 };
 

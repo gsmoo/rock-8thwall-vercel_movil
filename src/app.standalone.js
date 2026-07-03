@@ -1,6 +1,6 @@
 import {splashImageComponent} from './splash-image.js'
 import {backButtonComponent, nextButtonComponent} from './button.js'
-import {modelSpawnComponent} from './component.js?v=target-child-20260703a'
+import {modelSpawnComponent} from './component.js?v=take001-manual-20260703a'
 import './confetti.js'
 import './texture-pulse.js'
 
@@ -65,19 +65,34 @@ AFRAME.registerComponent('aplicar-video-a-screen', {
     videoTexture.encoding = THREE.sRGBEncoding
     videoTexture.flipY = false
 
-    el.addEventListener('model-loaded', () => {
+    const applyVideoToScreens = () => {
       const mesh = el.getObject3D('mesh')
       if (!mesh) return
 
       mesh.traverse((node) => {
-        if (node.isMesh && node.material.name === 'screen') {
-          node.material.map = videoTexture
-          node.material.emissiveMap = videoTexture
-          node.material.roughness = 0.1
-          node.material.emissive = new THREE.Color(0xffffff)
-          node.material.needsUpdate = true
-        }
+        if (!node.isMesh || !node.material) return
+
+        const materials = Array.isArray(node.material) ? node.material : [node.material]
+        materials.forEach((material) => {
+          const materialName = material?.name || ''
+          const normalizedName = materialName.toLowerCase()
+          if (normalizedName === 'screen' || normalizedName.endsWith(':screen')) {
+            material.map = videoTexture
+            material.emissiveMap = videoTexture
+            material.roughness = 0.1
+            material.emissive = new THREE.Color(0xffffff)
+            material.needsUpdate = true
+          }
+        })
       })
+    }
+
+    el.addEventListener('model-loaded', () => {
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        applyVideoToScreens()
+      } else {
+        video.addEventListener('canplay', applyVideoToScreens, {once: true})
+      }
     })
   },
 })
