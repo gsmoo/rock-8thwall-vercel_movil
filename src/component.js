@@ -18,6 +18,47 @@ function safeActivateComponent(entity, componentName) {
   }, 50);
 }
 
+function createRockDebug() {
+  const enabled = new URLSearchParams(window.location.search).has('debug');
+  const state = window.__rockDebug = window.__rockDebug || {lines: []};
+
+  const write = (message) => {
+    const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+    state.lines.push(line);
+    state.lines = state.lines.slice(-10);
+    console.log(`[rock-debug] ${message}`);
+
+    if (!enabled) return;
+
+    let panel = document.getElementById('rock-debug-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'rock-debug-panel';
+      panel.style.cssText = [
+        'position:fixed',
+        'left:8px',
+        'right:8px',
+        'bottom:8px',
+        'z-index:999999',
+        'padding:8px',
+        'background:rgba(0,0,0,.78)',
+        'color:#00ff99',
+        'font:11px/1.35 monospace',
+        'white-space:pre-wrap',
+        'pointer-events:none',
+        'max-height:42vh',
+        'overflow:hidden',
+      ].join(';');
+      document.body.appendChild(panel);
+    }
+    panel.textContent = state.lines.join('\n');
+  };
+
+  return {enabled, write};
+}
+
+const rockDebug = createRockDebug();
+
 AFRAME.registerComponent('play-model-animation', {
   schema: {
     clip: {default: 'Take 001'},
@@ -28,26 +69,33 @@ AFRAME.registerComponent('play-model-animation', {
     this.mixer = null;
     this.actions = [];
     this.lastDebugTime = 0;
+    this.sampleJoint = null;
     this.onModelLoaded = this.onModelLoaded.bind(this);
     this.el.addEventListener('model-loaded', this.onModelLoaded);
+    rockDebug.write('play-model-animation init');
   },
 
   onModelLoaded(event) {
     const root = event.detail?.model || this.el.getObject3D('mesh');
     if (!root) {
       console.warn('⚠️ Model root not found for animation.');
+      rockDebug.write('ERROR: model root not found');
       return;
     }
 
     this.prepareAnimatedMeshes(root);
+    this.sampleJoint = root.getObjectByName('fence02_L_00_jnt') || root.getObjectByName('column_L_00_jnt') || root.getObjectByName('god_M_root_jnt');
 
     const clips = this.getAnimationClips(root);
     const selectedClips = this.selectClips(clips);
 
     console.log('🎞 Animation clips detected:', clips.map((clip) => `${clip.name} (${clip.tracks?.length || 0} tracks)`).join(', ') || 'none');
+    rockDebug.write(`model-loaded clips=${clips.length}: ${clips.map((clip) => `${clip.name}/${clip.tracks?.length || 0}`).join(', ') || 'none'}`);
+    rockDebug.write(`selected "${this.data.clip}"=${selectedClips.length}; sampleJoint=${this.sampleJoint?.name || 'none'}`);
 
     if (!selectedClips.length) {
       console.warn(`⚠️ Animation "${this.data.clip}" not found. No model animation started.`);
+      rockDebug.write(`ERROR: animation "${this.data.clip}" not found`);
       return;
     }
 
@@ -60,6 +108,7 @@ AFRAME.registerComponent('play-model-animation', {
       action.enabled = true;
       action.play();
       console.log(`▶️ Playing animation "${clip.name}" with ${clip.tracks?.length || 0} tracks at ${Math.round(this.data.timeScale * 100)}% speed`);
+      rockDebug.write(`playing ${clip.name}/${clip.tracks?.length || 0} tracks at ${Math.round(this.data.timeScale * 100)}%`);
       return action;
     });
   },
@@ -118,7 +167,10 @@ AFRAME.registerComponent('play-model-animation', {
 
     if (time - this.lastDebugTime > 2000 && this.actions.length) {
       this.lastDebugTime = time;
-      console.log(`⏱ Animation mixer running: ${this.actions.length} action(s), first time ${this.actions[0].time.toFixed(2)}s`);
+      const sampleScale = this.sampleJoint ? `${this.sampleJoint.scale.x.toFixed(3)},${this.sampleJoint.scale.y.toFixed(3)},${this.sampleJoint.scale.z.toFixed(3)}` : 'none';
+      const actionTimes = this.actions.map((action) => action.time.toFixed(2)).join(',');
+      console.log(`⏱ Animation mixer running: ${this.actions.length} action(s), times ${actionTimes}, sample scale ${sampleScale}`);
+      rockDebug.write(`tick actions=${this.actions.length}; times=${actionTimes}; jointScale=${sampleScale}`);
     }
   },
 
@@ -142,6 +194,7 @@ const modelSpawnComponent = {
       if (found) return;
 
       console.log('➡ Image Target detected → Spawning model directly');
+      rockDebug.write('image target detected; spawning model');
 
       // ✅ Crear el modelo dinámicamente
       const model = document.createElement('a-entity');
@@ -162,9 +215,11 @@ const modelSpawnComponent = {
       model.flushToDOM();
 
       console.log('✅ Modelo creado como entidad raíz');
+      rockDebug.write('model entity created');
 
       model.addEventListener('model-loaded', (event) => {
         console.log('✅ Model loaded');
+        rockDebug.write('model-loaded event received');
 
         const clips = event.detail?.model?.animations || model.getObject3D('mesh')?.animations || [];
         console.log('🎞 Animation clips detected:', clips.map((clip) => `${clip.name} (${clip.tracks?.length || 0} tracks)`).join(', ') || 'none');
