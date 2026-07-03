@@ -1,6 +1,6 @@
 import {splashImageComponent} from './splash-image.js'
 import {backButtonComponent, nextButtonComponent} from './button.js'
-import {modelSpawnComponent} from './component.js?v=nearclip-002-20260703a'
+import {modelSpawnComponent} from './component.js?v=splash-gates-xr-20260703a'
 import './confetti.js'
 import './texture-pulse.js'
 
