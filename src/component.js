@@ -18,173 +18,6 @@ function safeActivateComponent(entity, componentName) {
   }, 50);
 }
 
-function createRockDebug() {
-  const enabled = new URLSearchParams(window.location.search).has('debug');
-  const state = window.__rockDebug = window.__rockDebug || {lines: []};
-
-  const write = (message) => {
-    const line = `[${new Date().toLocaleTimeString()}] ${message}`;
-    state.lines.push(line);
-    state.lines = state.lines.slice(-10);
-    console.log(`[rock-debug] ${message}`);
-
-    if (!enabled) return;
-
-    let panel = document.getElementById('rock-debug-panel');
-    if (!panel) {
-      panel = document.createElement('div');
-      panel.id = 'rock-debug-panel';
-      panel.style.cssText = [
-        'position:fixed',
-        'left:8px',
-        'right:8px',
-        'bottom:8px',
-        'z-index:999999',
-        'padding:8px',
-        'background:rgba(0,0,0,.78)',
-        'color:#00ff99',
-        'font:11px/1.35 monospace',
-        'white-space:pre-wrap',
-        'pointer-events:none',
-        'max-height:42vh',
-        'overflow:hidden',
-      ].join(';');
-      document.body.appendChild(panel);
-    }
-    panel.textContent = state.lines.join('\n');
-  };
-
-  return {enabled, write};
-}
-
-const rockDebug = createRockDebug();
-
-AFRAME.registerComponent('play-model-animation', {
-  schema: {
-    clip: {default: 'Take 001'},
-    timeScale: {default: 0.75},
-  },
-
-  init() {
-    this.mixer = null;
-    this.actions = [];
-    this.lastDebugTime = 0;
-    this.sampleJoint = null;
-    this.onModelLoaded = this.onModelLoaded.bind(this);
-    this.el.addEventListener('model-loaded', this.onModelLoaded);
-    rockDebug.write('play-model-animation init');
-  },
-
-  onModelLoaded(event) {
-    const root = event.detail?.model || this.el.getObject3D('mesh');
-    if (!root) {
-      console.warn('⚠️ Model root not found for animation.');
-      rockDebug.write('ERROR: model root not found');
-      return;
-    }
-
-    this.prepareAnimatedMeshes(root);
-    this.sampleJoint = root.getObjectByName('fence02_L_00_jnt') || root.getObjectByName('column_L_00_jnt') || root.getObjectByName('god_M_root_jnt');
-
-    const clips = this.getAnimationClips(root);
-    const selectedClips = this.selectClips(clips);
-
-    console.log('🎞 Animation clips detected:', clips.map((clip) => `${clip.name} (${clip.tracks?.length || 0} tracks)`).join(', ') || 'none');
-    rockDebug.write(`model-loaded clips=${clips.length}: ${clips.map((clip) => `${clip.name}/${clip.tracks?.length || 0}`).join(', ') || 'none'}`);
-    rockDebug.write(`selected "${this.data.clip}"=${selectedClips.length}; sampleJoint=${this.sampleJoint?.name || 'none'}`);
-
-    if (!selectedClips.length) {
-      console.warn(`⚠️ Animation "${this.data.clip}" not found. No model animation started.`);
-      rockDebug.write(`ERROR: animation "${this.data.clip}" not found`);
-      return;
-    }
-
-    this.mixer = new THREE.AnimationMixer(root);
-    this.actions = selectedClips.map((clip) => {
-      const action = this.mixer.clipAction(clip, root);
-      action.reset();
-      action.setLoop(THREE.LoopRepeat, Infinity);
-      action.setEffectiveTimeScale(this.data.timeScale);
-      action.enabled = true;
-      action.play();
-      console.log(`▶️ Playing animation "${clip.name}" with ${clip.tracks?.length || 0} tracks at ${Math.round(this.data.timeScale * 100)}% speed`);
-      rockDebug.write(`playing ${clip.name}/${clip.tracks?.length || 0} tracks at ${Math.round(this.data.timeScale * 100)}%`);
-      return action;
-    });
-  },
-
-  getAnimationClips(root) {
-    const sources = [
-      root?.animations,
-      root?.geometry?.animations,
-      this.el.components?.['gltf-model']?.model?.animations,
-      this.el.getObject3D('mesh')?.animations,
-    ];
-
-    const clips = [];
-    const seen = new Set();
-    sources.flat().filter(Boolean).forEach((clip) => {
-      if (seen.has(clip)) return;
-      seen.add(clip);
-      clips.push(clip);
-    });
-
-    return clips;
-  },
-
-  selectClips(clips) {
-    const exact = clips.filter((clip) => clip.name === this.data.clip);
-    if (exact.length) return exact;
-
-    const normalizedTarget = this.data.clip.toLowerCase();
-    return clips.filter((clip) => clip.name?.toLowerCase() === normalizedTarget);
-  },
-
-  prepareAnimatedMeshes(root) {
-    const skinnedBaseNames = new Set();
-
-    root.traverse((node) => {
-      if (!node.isMesh) return;
-      node.frustumCulled = false;
-      if (node.isSkinnedMesh) {
-        skinnedBaseNames.add(node.name.replace(/\.001$/, ''));
-        node.visible = true;
-      }
-    });
-
-    root.traverse((node) => {
-      if (!node.isMesh || node.isSkinnedMesh) return;
-      if (skinnedBaseNames.has(node.name)) {
-        node.visible = false;
-        console.log(`🙈 Hiding static duplicate mesh "${node.name}" so the skinned animation is visible`);
-      }
-    });
-  },
-
-  tick(time, deltaTime) {
-    if (!this.mixer || !deltaTime) return;
-    this.mixer.update(deltaTime / 1000);
-
-    if (time - this.lastDebugTime > 2000 && this.actions.length) {
-      this.lastDebugTime = time;
-      const sampleScale = this.sampleJoint ? `${this.sampleJoint.scale.x.toFixed(3)},${this.sampleJoint.scale.y.toFixed(3)},${this.sampleJoint.scale.z.toFixed(3)}` : 'none';
-      const actionTimes = this.actions.map((action) => action.time.toFixed(2)).join(',');
-      console.log(`⏱ Animation mixer running: ${this.actions.length} action(s), times ${actionTimes}, sample scale ${sampleScale}`);
-      rockDebug.write(`tick actions=${this.actions.length}; times=${actionTimes}; jointScale=${sampleScale}`);
-    }
-  },
-
-  remove() {
-    this.el.removeEventListener('model-loaded', this.onModelLoaded);
-    if (this.mixer) {
-      this.actions.forEach((action) => action.stop());
-      this.mixer.stopAllAction();
-    }
-    this.mixer = null;
-    this.actions = [];
-  },
-});
-
 const modelSpawnComponent = {
   init() {
     const scene = this.el.sceneEl;
@@ -194,7 +27,6 @@ const modelSpawnComponent = {
       if (found) return;
 
       console.log('➡ Image Target detected → Spawning model directly');
-      rockDebug.write('image target detected; spawning model');
 
       // ✅ Crear el modelo dinámicamente
       const model = document.createElement('a-entity');
@@ -204,7 +36,7 @@ const modelSpawnComponent = {
       model.setAttribute('scale', '9 9 9');
       model.setAttribute('xrextras-pinch-scale', '');
       model.setAttribute('xrextras-hold-drag', 'riseHeight: 0.25');
-      model.setAttribute('play-model-animation', 'clip: Take 001; timeScale: 0.75');
+      model.setAttribute('animation-mixer', 'clip: Take 001; loop: repeat; timeScale: 0.75');
       model.setAttribute('position', '0 0 0');
       model.classList.add('cantap');
       model.setAttribute('visible', 'true');
@@ -215,14 +47,13 @@ const modelSpawnComponent = {
       model.flushToDOM();
 
       console.log('✅ Modelo creado como entidad raíz');
-      rockDebug.write('model entity created');
 
       model.addEventListener('model-loaded', (event) => {
         console.log('✅ Model loaded');
-        rockDebug.write('model-loaded event received');
 
         const clips = event.detail?.model?.animations || model.getObject3D('mesh')?.animations || [];
-        console.log('🎞 Animation clips detected:', clips.map((clip) => `${clip.name} (${clip.tracks?.length || 0} tracks)`).join(', ') || 'none');
+        console.log('🎞 Animation clips detected:', clips.map((clip) => clip.name).join(', ') || 'none');
+        model.setAttribute('animation-mixer', 'clip: Take 001; loop: repeat; timeScale: 0.75');
 
         model.setAttribute('visible', 'true');
         model.object3D.position.set(0, 0, 0);
@@ -230,24 +61,13 @@ const modelSpawnComponent = {
         // ✅ VINCULAR el mesh al entity para el raycaster
         const mesh = model.getObject3D('mesh');
         if (mesh) {
-          const skinnedBaseNames = new Set();
-
-          mesh.traverse((node) => {
-            if (node.isSkinnedMesh) {
-              skinnedBaseNames.add(node.name.replace(/\.001$/, ''));
-              node.visible = true;
-            }
-          });
-
           mesh.traverse((node) => {
             if (node.isMesh) {
-              if (!node.isSkinnedMesh && skinnedBaseNames.has(node.name)) {
-                node.visible = false;
-                return;
-              }
-
               node.userData.aframeEntity = model;
               node.raycast = THREE.Mesh.prototype.raycast;
+              node.onBeforeRender = () => {
+                node.visible = true;
+              };
               console.log(`✅ Mesh "${node.name}" vinculado y raycast habilitado`);
             }
           });
@@ -403,8 +223,6 @@ const modelSpawnComponent = {
       found = true;
     };
 
-    this.el.addEventListener('xrextrasfound', showObject);
-    this.el.addEventListener('xrimagefound', showObject);
     scene.addEventListener('xrimagefound', showObject);
   },
 };
